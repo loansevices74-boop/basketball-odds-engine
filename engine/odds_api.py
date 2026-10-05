@@ -27,7 +27,6 @@ class OddsAPIService:
         """Groups basketball leagues by country."""
         leagues = self.get_basketball_leagues()
         
-        # Manual country mapping for better organization
         country_mapping = {
             "USA": ["nba", "wnba", "ncaab", "ncaaw"],
             "Europe": ["euroleague", "eurocup"],
@@ -50,20 +49,17 @@ class OddsAPIService:
             "International": ["fiba-world-cup", "fiba-olympic-qualifying"]
         }
         
-        # Group leagues by country
         grouped = {}
         for league in leagues:
             key = league.get('key', '')
             title = league.get('title', '')
             
-            # Try to match with manual mapping
             matched_country = None
             for country, keywords in country_mapping.items():
                 if any(kw in key.lower() for kw in keywords):
                     matched_country = country
                     break
             
-            # If no match, try to extract from title
             if not matched_country:
                 if "NBA" in title:
                     matched_country = "USA"
