@@ -65,7 +65,6 @@ class OddsAPIService:
             
             # If no match, try to extract from title
             if not matched_country:
-                # Common patterns in titles
                 if "NBA" in title:
                     matched_country = "USA"
                 elif "Euro" in title:
