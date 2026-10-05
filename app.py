@@ -4,118 +4,82 @@ from engine.odds_api import OddsAPIService
 from engine.ocr_scanner import ScreenshotScanner
 from engine.predictor import BasketballPredictor
 
-# Page configuration
 st.set_page_config(page_title="Basketball Prediction & Odds Machine", layout="wide", page_icon="🏀")
-
-st.title(" Basketball Odds Engine & Slip Generator (>70% Confidence)")
+st.title("🏀 Basketball Odds Engine & Slip Generator (>70% Confidence)")
 
 # --- Sidebar API Keys ---
 st.sidebar.header("🔑 API Credentials")
-odds_api_key = st.sidebar.text_input(
-    "The Odds API Key", 
-    value=st.secrets.get("ODDS_API_KEY", ""), 
-    type="password"
-)
-qwen_api_key = st.sidebar.text_input(
-    "Qwen API Key (for Screenshots)", 
-    value=st.secrets.get("QWEN_API_KEY", ""), 
-    type="password"
-)
-qwen_base_url = st.sidebar.text_input(
-    "Qwen Base URL (Optional)", 
-    value=st.secrets.get("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
-)
+odds_api_key = st.sidebar.text_input("The Odds API Key", value=st.secrets.get("ODDS_API_KEY", ""), type="password")
+qwen_api_key = st.sidebar.text_input("Qwen API Key (for Screenshots)", value=st.secrets.get("QWEN_API_KEY", ""), type="password")
+qwen_base_url = st.sidebar.text_input("Qwen Base URL (Optional)", value=st.secrets.get("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"))
 
-tabs = st.tabs(["📊 Live Odds & Predictions", "📸 Screenshot Scanner", " Slip Accumulator"])
+tabs = st.tabs(["📊 Live Odds & Predictions", "📸 Screenshot Scanner", "🎫 Slip Accumulator"])
 
-# ============ TAB 0: Live Odds with Country Filter ============
+# ============ TAB 0: Live Odds (Simple List) ============
 with tabs[0]:
-    st.header("🌍 Fetch Match Odds by Country & League")
+    st.header("Fetch Match Odds & Generate Boundaries")
     
     if odds_api_key:
         api = OddsAPIService(odds_api_key)
-        
         try:
-            with st.spinner("Loading available countries and leagues..."):
-                leagues_by_country = api.get_leagues_by_country()
-            
-            if leagues_by_country:
-                # 1. Country Selector
-                countries = sorted(leagues_by_country.keys())
-                selected_country = st.selectbox(
-                    "🌍 Select Country", 
-                    ["All Countries"] + countries, 
-                    index=0
-                )
-                
-                # 2. League Selector
-                if selected_country == "All Countries":
-                    all_leagues = [l for leagues in leagues_by_country.values() for l in leagues]
-                    league_options = {f"{l['title']} ({l['key']})": l['key'] for l in all_leagues}
-                else:
-                    country_leagues = leagues_by_country.get(selected_country, [])
-                    league_options = {f"{l['title']} ({l['key']})": l['key'] for l in country_leagues}
-                
-                if league_options:
-                    selected_league_display = st.selectbox(" Select League", list(league_options.keys()))
-                    selected_league_key = league_options[selected_league_display]
-                    
-                    # 3. Fetch and Predict
-                    if st.button("Fetch Matches & Predict", type="primary"):
-                        with st.spinner(f"Fetching odds for {selected_league_display}..."):
-                            odds_data = api.get_odds(selected_league_key)
-                        
-                        if odds_data:
-                            st.success(f"✅ Found {len(odds_data)} matches in {selected_league_display}")
-                            st.write("---")
-                            
-                            for match in odds_data:
-                                home = match['home_team']
-                                away = match['away_team']
-                                
-                                # Dynamic score estimation from odds
-                                bookmakers = match.get('bookmakers', [])
-                                home_score = 82.0
-                                away_score = 78.0
-                                
-                                if bookmakers:
-                                    first_bookmaker = bookmakers[0]
-                                    markets = first_bookmaker.get('markets', [])
-                                    
-                                    for market in markets:
-                                        if market.get('key') == 'h2h':
-                                            outcomes = market.get('outcomes', [])
-                                            for outcome in outcomes:
-                                                name = outcome.get('name', '')
-                                                price = outcome.get('price', 2.0)
-                                                if home.lower() in name.lower():
-                                                    home_score = 80 + (2.5 - price) * 15
-                                                elif away.lower() in name.lower():
-                                                    away_score = 80 + (2.5 - price) * 15
-                                
-                                preds = BasketballPredictor.calculate_bounds(home_score, away_score)
-                                
-                                with st.expander(f"🏀 {home} vs {away}"):
-                                    col1, col2, col3 = st.columns(3)
-                                    col1.metric("Home Team", home)
-                                    col1.caption(f"Est. Score: {home_score:.1f}")
-                                    col2.metric("Away Team", away)
-                                    col2.caption(f"Est. Score: {away_score:.1f}")
-                                    col3.metric("Expected Total", preds['expected_fulltime'])
-                                    
-                                    st.write("**70% Confidence Bounds:**")
-                                    st.json(preds)
-                        else:
-                            st.warning("No matches found for this league. Try another league or check if games are scheduled.")
-                else:
-                    st.warning(f"No leagues available for {selected_country}. Try 'All Countries'.")
+            with st.spinner("Loading basketball leagues..."):
+                leagues = api.get_basketball_leagues()
+
+            if leagues:
+                # Create a simple dictionary of all leagues
+                league_names = {l['title']: l['key'] for l in leagues}
+                selected_league = st.selectbox("Select Basketball League", list(league_names.keys()))
+
+                if st.button("Fetch Matches & Predict", type="primary"):
+                    with st.spinner(f"Fetching odds for {selected_league}..."):
+                        odds_data = api.get_odds(league_names[selected_league])
+
+                    if odds_data:
+                        st.success(f"✅ Found {len(odds_data)} matches")
+                        st.write("---")
+
+                        for match in odds_data:
+                            home = match['home_team']
+                            away = match['away_team']
+
+                            # Dynamic score estimation from odds
+                            bookmakers = match.get('bookmakers', [])
+                            home_score = 82.0
+                            away_score = 78.0
+
+                            if bookmakers:
+                                first_bookmaker = bookmakers[0]
+                                markets = first_bookmaker.get('markets', [])
+                                for market in markets:
+                                    if market.get('key') == 'h2h':
+                                        outcomes = market.get('outcomes', [])
+                                        for outcome in outcomes:
+                                            name = outcome.get('name', '')
+                                            price = outcome.get('price', 2.0)
+                                            if home.lower() in name.lower():
+                                                home_score = 80 + (2.5 - price) * 15
+                                            elif away.lower() in name.lower():
+                                                away_score = 80 + (2.5 - price) * 15
+
+                            preds = BasketballPredictor.calculate_bounds(home_score, away_score)
+
+                            with st.expander(f"🏀 {home} vs {away}"):
+                                col1, col2, col3 = st.columns(3)
+                                col1.metric("Home Team", home)
+                                col1.caption(f"Est. Score: {home_score:.1f}")
+                                col2.metric("Away Team", away)
+                                col2.caption(f"Est. Score: {away_score:.1f}")
+                                col3.metric("Expected Total", preds['expected_fulltime'])
+                                st.write("**70% Confidence Bounds:**")
+                                st.json(preds)
+                    else:
+                        st.warning("No matches found for this league.")
             else:
                 st.warning("No active basketball leagues found or invalid API key.")
-                
         except Exception as e:
-            st.error(f"Error fetching leagues: {e}")
+            st.error(f"Error: {e}")
     else:
-        st.info("👉 Enter your Odds API key in the sidebar to fetch real-time odds.")
+        st.info("👉 Enter your Odds API key in the sidebar.")
 
 # ============ TAB 1: Screenshot Scanner ============
 with tabs[1]:
