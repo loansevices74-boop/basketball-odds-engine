@@ -37,12 +37,40 @@ with tabs[0]:
                 with st.spinner("Fetching odds..."):
                     odds_data = api.get_odds(league_names[selected_league])
                 st.write(f"Found {len(odds_data)} matches")
+                
                 for match in odds_data:
                     home = match['home_team']
                     away = match['away_team']
-                    preds = BasketballPredictor.calculate_bounds(82.0, 78.0)
-
+                    
+                    # Extract actual odds to estimate team strength
+                    bookmakers = match.get('bookmakers', [])
+                    home_score = 82.0  # Default fallback
+                    away_score = 78.0  # Default fallback
+                    
+                    # Try to extract implied scores from odds
+                    if bookmakers:
+                        first_bookmaker = bookmakers[0]
+                        markets = first_bookmaker.get('markets', [])
+                        
+                        for market in markets:
+                            if market.get('key') == 'h2h':  # Head-to-head market
+                                outcomes = market.get('outcomes', [])
+                                for outcome in outcomes:
+                                    name = outcome.get('name', '')
+                                    price = outcome.get('price', 2.0)
+                                    # Convert decimal odds to implied strength
+                                    # Lower odds = stronger team = higher expected score
+                                    if home.lower() in name.lower():
+                                        home_score = 80 + (2.5 - price) * 15
+                                    elif away.lower() in name.lower():
+                                        away_score = 80 + (2.5 - price) * 15
+                    
+                    # Calculate predictions with actual (or estimated) data
+                    preds = BasketballPredictor.calculate_bounds(home_score, away_score)
+                    
                     with st.expander(f"{home} vs {away}"):
+                        st.write(f"**Home Team:** {home} (Est. Score: {home_score:.1f})")
+                        st.write(f"**Away Team:** {away} (Est. Score: {away_score:.1f})")
                         st.json(preds)
         else:
             st.warning("No active leagues found or invalid API key.")
@@ -74,4 +102,4 @@ with tabs[2]:
     num_legs = st.number_input("Number of Legs", min_value=2, max_value=25, value=10)
     if st.button("Generate (>70%) Accumulator"):
         st.success(f"Generated Multi-Leg High-Probability Slip! (Confidence: {target_confidence}%, Legs: {int(num_legs)})")
-        st.info("️ Accumulator logic pending — integrate odds_data from Tab 0 to auto-select legs.")
+        st.info("⚠️ Accumulator logic pending — integrate odds_data from Tab 0 to auto-select legs.")
