@@ -8,17 +8,22 @@ st.set_page_config(page_title="Basketball Prediction & Odds Machine", layout="wi
 
 st.title("🏀 Basketball Odds Engine & Slip Generator (>70% Confidence)")
 
-# --- API Keys: Sidebar input OR Streamlit Secrets (for deployment) ---
+# --- API Keys ---
 st.sidebar.header("🔑 API Credentials")
 odds_api_key = st.sidebar.text_input(
     "The Odds API Key",
     value=st.secrets.get("ODDS_API_KEY", ""),
     type="password"
 )
-gemini_api_key = st.sidebar.text_input(
-    "Gemini API Key (for Screenshots)",
-    value=st.secrets.get("GEMINI_API_KEY", ""),
+qwen_api_key = st.sidebar.text_input(
+    "Qwen API Key (for Screenshots)",
+    value=st.secrets.get("QWEN_API_KEY", ""),
     type="password"
+)
+qwen_base_url = st.sidebar.text_input(
+    "Qwen Base URL (Optional)",
+    value=st.secrets.get("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+    help="e.g., https://dashscope.aliyuncs.com/compatible-mode/v1 or https://openrouter.ai/api/v1"
 )
 
 tabs = st.tabs(["📊 Live Odds & Predictions", "📸 Screenshot Scanner", "🎫 Slip Accumulator"])
@@ -42,30 +47,24 @@ with tabs[0]:
                     home = match['home_team']
                     away = match['away_team']
                     
-                    # Extract actual odds to estimate team strength
                     bookmakers = match.get('bookmakers', [])
-                    home_score = 82.0  # Default fallback
-                    away_score = 78.0  # Default fallback
+                    home_score = 82.0
+                    away_score = 78.0
                     
-                    # Try to extract implied scores from odds
                     if bookmakers:
                         first_bookmaker = bookmakers[0]
                         markets = first_bookmaker.get('markets', [])
-                        
                         for market in markets:
-                            if market.get('key') == 'h2h':  # Head-to-head market
+                            if market.get('key') == 'h2h':
                                 outcomes = market.get('outcomes', [])
                                 for outcome in outcomes:
                                     name = outcome.get('name', '')
                                     price = outcome.get('price', 2.0)
-                                    # Convert decimal odds to implied strength
-                                    # Lower odds = stronger team = higher expected score
                                     if home.lower() in name.lower():
                                         home_score = 80 + (2.5 - price) * 15
                                     elif away.lower() in name.lower():
                                         away_score = 80 + (2.5 - price) * 15
                     
-                    # Calculate predictions with actual (or estimated) data
                     preds = BasketballPredictor.calculate_bounds(home_score, away_score)
                     
                     with st.expander(f"{home} vs {away}"):
@@ -82,18 +81,18 @@ with tabs[1]:
     st.header("📸 Upload Screenshot (.png, .jpg)")
     uploaded_file = st.file_uploader("Upload Betting App Screenshot", type=["png", "jpg", "jpeg"])
 
-    if uploaded_file and gemini_api_key:
+    if uploaded_file and qwen_api_key:
         img = Image.open(uploaded_file)
         st.image(img, caption="Uploaded Screenshot", use_container_width=True)
 
-        if st.button("Scan Screenshot"):
-            with st.spinner("Extracting match odds and generating boundaries..."):
-                scanner = ScreenshotScanner(gemini_api_key)
+        if st.button("Scan Screenshot with Qwen"):
+            with st.spinner("Extracting match odds using Qwen Vision..."):
+                scanner = ScreenshotScanner(qwen_api_key, qwen_base_url)
                 result = scanner.scan_image(img)
                 st.markdown("### Processed Analysis")
                 st.markdown(result)
-    elif uploaded_file and not gemini_api_key:
-        st.warning("Please enter your Gemini API Key in the sidebar to process images.")
+    elif uploaded_file and not qwen_api_key:
+        st.warning("Please enter your Qwen API Key in the sidebar to process images.")
 
 # ============ TAB 2: Slip Accumulator ============
 with tabs[2]:
@@ -102,4 +101,3 @@ with tabs[2]:
     num_legs = st.number_input("Number of Legs", min_value=2, max_value=25, value=10)
     if st.button("Generate (>70%) Accumulator"):
         st.success(f"Generated Multi-Leg High-Probability Slip! (Confidence: {target_confidence}%, Legs: {int(num_legs)})")
-        st.info("⚠️ Accumulator logic pending — integrate odds_data from Tab 0 to auto-select legs.")
