@@ -45,7 +45,7 @@ class ScreenshotScanner:
             # 4. Call Qwen API (OpenAI compatible format)
             # Note: Change the model name below if your provider uses a different exact ID
             response = self.client.chat.completions.create(
-                model="qwen/qwen-2.5-vl-72b-instruct",  # <-- Change this if your provider uses "qwen-omni-flash" or similar
+                model="qwen-vl-max",  # <-- Change this if your provider uses "qwen-omni-flash" or similar
                 messages=[
                     {
                         "role": "user",
